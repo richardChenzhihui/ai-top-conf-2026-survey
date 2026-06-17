@@ -1,0 +1,8 @@
+# Data fetching
+requests>=2.31
+
+# Excel report
+openpyxl>=3.1
+
+# Interactive visualization dashboard
+plotly>=6.0

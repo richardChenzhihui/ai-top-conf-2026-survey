@@ -1,0 +1,18 @@
+# OS / editor cruft
+.DS_Store
+**/.DS_Store
+~$*
+*.tmp
+.claude/
+
+# Intermediate batch splits (regenerable from *_raw.json via split_batches.py)
+data/*_batches/
+data/*_batches_100/
+data/_analysis/cvpr/
+data/_analysis/iclr/
+data/_analysis/neurips/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
