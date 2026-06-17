@@ -10,8 +10,14 @@ Output:
 
 import json
 import re
+import sys
 from pathlib import Path
 from collections import Counter, defaultdict
+
+# Canonical taxonomy lives in classify_keywords.py — import it so this script
+# never drifts out of sync with the classifier (was previously hardcoded).
+sys.path.insert(0, str(Path(__file__).parent))
+from classify_keywords import CATEGORY_ORDER, CORE_CATEGORIES
 
 try:
     import openpyxl
@@ -35,40 +41,8 @@ OUT  = BASE / "survey_2026.xlsx"
 CONFS = ["cvpr", "iclr", "neurips"]
 CONF_LABELS = {"cvpr": "CVPR 2026", "iclr": "ICLR 2026", "neurips": "NeurIPS 2025"}
 
-CORE_CATS = [
-    "多模态大模型（MLLM/VLM）",
-    "强化学习后训练（RLHF/DPO/GRPO/奖励模型）",
-    "Agent 系统",
-    "Agent 后训练",
-    "大语言模型预训练（架构/数据/规模）",
-    "大模型 Infra（推理/训练/效率系统）",
-]
-
-ALL_CATS = [
-    "多模态大模型（MLLM/VLM）",
-    "强化学习后训练（RLHF/DPO/GRPO/奖励模型）",
-    "Agent 系统",
-    "Agent 后训练",
-    "大语言模型预训练（架构/数据/规模）",
-    "大模型 Infra（推理/训练/效率系统）",
-    "推理与规划（CoT/数学/逻辑，非 RL 类）",
-    "代码生成与编程语言处理",
-    "安全与对齐（幻觉/偏见/毒性/越狱，非 RL 类）",
-    "评测与基准构建",
-    "图神经网络与结构化学习",
-    "理论与优化",
-    "对话系统与文本生成",
-    "目标检测与分割",
-    "生成模型（扩散/GAN/视频生成/图像编辑，非 MLLM 驱动）",
-    "三维视觉（NeRF/3DGS/深度估计/点云）",
-    "视频理解（动作识别/跟踪/时序建模，非 MLLM 类）",
-    "底层视觉（超分/去噪/增强）",
-    "人体相关（姿态/人脸/手势/运动合成）",
-    "医学影像（非多模态大模型类）",
-    "自动驾驶（感知/预测/规划）",
-    "遥感与卫星",
-    "其他",
-]
+CORE_CATS = list(CORE_CATEGORIES)
+ALL_CATS = list(CATEGORY_ORDER)
 
 # ---------------------------------------------------------------------------
 # Style helpers
@@ -140,11 +114,13 @@ COLS_ALL = [
     ("序号",        "idx",          5),
     ("会议",        "conference",   8),
     ("Track",       "track",        9),
-    ("论文标题",    "title_en",     55),
+    ("中文标题",    "title_zh",     38),
+    ("论文标题",    "title_en",     50),
     ("L1 类别",     "category_l1",  22),
     ("L2 子方向",   "category_l2",  18),
-    ("关键词",      "keywords",     25),
-    ("摘要",        "abstract",     60),
+    ("中文摘要",    "summary_zh",   60),
+    ("关键词",      "keywords",     22),
+    ("英文摘要",    "abstract",     55),
 ]
 
 def build_all_sheet(wb, papers):
@@ -174,7 +150,8 @@ def build_all_sheet(wb, papers):
             val = p.get(field, "")
             if field == "idx":
                 val = row_idx - 1
-            data_cell(ws, row_idx, col, val, alt=alt, wrap=(field in ("title_en", "abstract", "keywords")))
+            data_cell(ws, row_idx, col, val, alt=alt,
+                      wrap=(field in ("title_en", "title_zh", "abstract", "summary_zh", "keywords")))
 
     for col, w in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(col)].width = w

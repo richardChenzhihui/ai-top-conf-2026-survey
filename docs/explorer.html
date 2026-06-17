@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>论文检索 · CVPR/ICLR/NeurIPS 2025–2026</title>
+<style>
+  * { box-sizing:border-box; }
+  body { font-family:"PingFang SC","Microsoft YaHei",-apple-system,sans-serif;
+         margin:0; background:#f4f6fa; color:#1c2333; }
+  a { color:#2E75B6; text-decoration:none; }
+  header { background:linear-gradient(135deg,#16264d,#2E75B6); color:#fff; padding:18px 24px; }
+  header h1 { margin:0; font-size:19px; display:inline-block; }
+  header a.home { color:#cfe0f5; font-size:13px; margin-left:14px; }
+  .controls { position:sticky; top:0; z-index:5; background:#fff; padding:14px 24px;
+              box-shadow:0 2px 8px rgba(20,40,80,.08); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .controls input, .controls select { padding:8px 11px; border:1px solid #d3dae6; border-radius:8px;
+              font-size:14px; background:#fff; }
+  .controls input#q { flex:1; min-width:220px; }
+  .count { font-size:13px; color:#5a6577; margin-left:auto; }
+  .list { max-width:1080px; margin:18px auto; padding:0 20px; }
+  .item { background:#fff; border-radius:10px; padding:16px 18px; margin-bottom:12px;
+          box-shadow:0 1px 6px rgba(20,40,80,.06); }
+  .item .tz { font-size:16px; font-weight:600; color:#16264d; }
+  .item .te { font-size:13px; color:#7a8499; margin:2px 0 8px; }
+  .tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  .tag { font-size:11.5px; padding:2px 9px; border-radius:20px; background:#eef3fb; color:#2E75B6; }
+  .tag.cf { background:#e9f7ef; color:#2a9d5a; }
+  .tag.tk { background:#fdf0e6; color:#d98324; }
+  .sm { font-size:13.5px; color:#3c485e; }
+  .item .link { font-size:13px; margin-left:8px; }
+  .pager { text-align:center; margin:22px 0 50px; }
+  .pager button { padding:8px 16px; margin:0 5px; border:1px solid #d3dae6; background:#fff;
+          border-radius:8px; cursor:pointer; font-size:14px; }
+  .pager button:disabled { opacity:.45; cursor:default; }
+  .loading { text-align:center; padding:60px; color:#7a8499; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📚 论文检索</h1><a class="home" href="index.html">← 返回首页</a>
+</header>
+<div class="controls">
+  <input id="q" placeholder="搜索标题 / 摘要 / 关键词（中英文均可）…">
+  <select id="conf"><option value="">全部会议</option></select>
+  <select id="l1"><option value="">全部一级方向</option></select>
+  <select id="l2"><option value="">全部子方向</option></select>
+  <span class="count" id="count">加载中…</span>
+</div>
+<div class="list" id="list"><div class="loading">正在加载论文数据…</div></div>
+<div class="pager" id="pager"></div>
+
+<script>
+const PAGE = 50;
+let DATA = [], view = [], page = 0;
+const $ = id => document.getElementById(id);
+const esc = s => (s||"").replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+fetch('data/papers.json').then(r => r.json()).then(d => {
+  DATA = d;
+  initFilters();
+  apply();
+}).catch(e => { $('list').innerHTML = '<div class="loading">数据加载失败：' + e + '</div>'; });
+
+function initFilters() {
+  const confs = [...new Set(DATA.map(p => p.cf))];
+  confs.forEach(c => $('conf').add(new Option(c, c)));
+  const l1s = [...new Set(DATA.map(p => p.l1))].sort((a,b) =>
+    DATA.filter(p=>p.l1===b).length - DATA.filter(p=>p.l1===a).length);
+  l1s.forEach(c => $('l1').add(new Option(c, c)));
+  $('conf').addEventListener('change', () => { page = 0; apply(); });
+  $('l2').addEventListener('change', () => { page = 0; apply(); });
+  $('l1').addEventListener('change', () => { refreshL2(); page = 0; apply(); });
+  $('q').addEventListener('input', debounce(() => { page = 0; apply(); }, 180));
+}
+function refreshL2() {
+  const l1 = $('l1').value;
+  const pool = l1 ? DATA.filter(p => p.l1===l1) : DATA;
+  const l2s = [...new Set(pool.map(p => p.l2).filter(Boolean))].sort();
+  $('l2').innerHTML = '<option value="">全部子方向</option>';
+  l2s.forEach(c => $('l2').add(new Option(c, c)));
+}
+function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+
+function apply() {
+  const q = $('q').value.trim().toLowerCase();
+  const cf = $('conf').value, l1 = $('l1').value, l2 = $('l2').value;
+  view = DATA.filter(p => {
+    if (cf && p.cf !== cf) return false;
+    if (l1 && p.l1 !== l1) return false;
+    if (l2 && p.l2 !== l2) return false;
+    if (q) {
+      const hay = (p.te + ' ' + p.tz + ' ' + p.sm + ' ' + p.kw).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  $('count').textContent = '共 ' + view.length.toLocaleString() + ' 篇';
+  render();
+}
+
+function render() {
+  const start = page * PAGE;
+  const slice = view.slice(start, start + PAGE);
+  if (!slice.length) { $('list').innerHTML = '<div class="loading">没有匹配的论文，换个关键词试试。</div>'; $('pager').innerHTML=''; return; }
+  $('list').innerHTML = slice.map(p => {
+    const link = p.u ? `<a class="link" href="${p.u}" target="_blank" rel="noopener">原文 ↗</a>` : '';
+    const tk = p.tk ? `<span class="tag tk">${esc(p.tk)}</span>` : '';
+    const l2 = p.l2 ? `<span class="tag">${esc(p.l2)}</span>` : '';
+    return `<div class="item">
+      <div class="tz">${esc(p.tz || p.te)}${link}</div>
+      <div class="te">${esc(p.te)}</div>
+      <div class="tags"><span class="tag cf">${esc(p.cf)}</span><span class="tag">${esc(p.l1)}</span>${l2}${tk}</div>
+      <div class="sm">${esc(p.sm)}</div>
+    </div>`;
+  }).join('');
+  const pages = Math.ceil(view.length / PAGE);
+  $('pager').innerHTML =
+    `<button onclick="go(-1)" ${page<=0?'disabled':''}>← 上一页</button>` +
+    `<span style="font-size:13px;color:#5a6577"> 第 ${page+1} / ${pages} 页 </span>` +
+    `<button onclick="go(1)" ${page>=pages-1?'disabled':''}>下一页 →</button>`;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function go(d){ page += d; render(); }
+</script>
+</body>
+</html>

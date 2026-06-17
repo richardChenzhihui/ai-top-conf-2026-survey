@@ -6,3 +6,7 @@ openpyxl>=3.1
 
 # Interactive visualization dashboard
 plotly>=6.0
+
+# LLM classification (MiniMax, OpenAI-compatible API) + robust JSON parsing
+openai>=1.40
+json_repair>=0.30
